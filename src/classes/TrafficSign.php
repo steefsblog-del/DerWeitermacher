@@ -17,88 +17,42 @@ class TrafficSign {
     }
 
     /**
-     * Verkehrszeichen abrufen
+     * Alle Zeichen abrufen
      */
-    public function getSign($signId) {
-        $sql = "SELECT * FROM {$this->table} WHERE id = :id";
+    public function getAllSigns() {
+        $sql = "SELECT * FROM {$this->table} WHERE active = TRUE ORDER BY category, sign_code";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([':id' => $signId]);
-        return $stmt->fetch();
+        $stmt->execute();
+        return $stmt->fetchAll();
     }
 
     /**
-     * Verkehrszeichen nach Code abrufen
-     */
-    public function getSignByCode($code) {
-        $sql = "SELECT * FROM {$this->table} WHERE sign_code = :code";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([':code' => $code]);
-        return $stmt->fetch();
-    }
-
-    /**
-     * Alle Zeichen einer Kategorie
+     * Zeichen nach Kategorie filtern
      */
     public function getSignsByCategory($category) {
-        $sql = "SELECT * FROM {$this->table} WHERE category = :category AND rsa21_compliant = TRUE 
-                ORDER BY sign_code ASC";
+        $sql = "SELECT * FROM {$this->table} WHERE category = :category AND active = TRUE ORDER BY sign_code";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':category' => $category]);
         return $stmt->fetchAll();
     }
 
     /**
-     * Alle RSA21-konformen Zeichen
+     * Zeichen nach ID abrufen
      */
-    public function getAllSigns() {
-        $sql = "SELECT * FROM {$this->table} WHERE rsa21_compliant = TRUE ORDER BY sign_code ASC";
+    public function getSignById($signId) {
+        $sql = "SELECT * FROM {$this->table} WHERE id = :id AND active = TRUE";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute();
-        return $stmt->fetchAll();
+        $stmt->execute([':id' => $signId]);
+        return $stmt->fetch();
     }
 
     /**
-     * Zeichen gruppiert nach Kategorie
+     * Kategorien abrufen
      */
-    public function getSignsByCategories() {
-        $sql = "SELECT * FROM {$this->table} WHERE rsa21_compliant = TRUE 
-                ORDER BY category, sign_code ASC";
+    public function getCategories() {
+        $sql = "SELECT DISTINCT category FROM {$this->table} WHERE active = TRUE ORDER BY category";
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
-        
-        $signs = $stmt->fetchAll();
-        $grouped = [];
-        
-        foreach ($signs as $sign) {
-            $category = $sign['category'];
-            if (!isset($grouped[$category])) {
-                $grouped[$category] = [];
-            }
-            $grouped[$category][] = $sign;
-        }
-        
-        return $grouped;
-    }
-
-    /**
-     * Neues Zeichen hinzufügen
-     */
-    public function addSign($data) {
-        $sql = "INSERT INTO {$this->table} 
-                (sign_code, sign_name, description, category, svg_path, width, height)
-                VALUES 
-                (:sign_code, :sign_name, :description, :category, :svg_path, :width, :height)";
-
-        $stmt = $this->db->prepare($sql);
-        
-        return $stmt->execute([
-            ':sign_code' => $data['sign_code'],
-            ':sign_name' => $data['sign_name'],
-            ':description' => $data['description'] ?? null,
-            ':category' => $data['category'],
-            ':svg_path' => $data['svg_path'] ?? null,
-            ':width' => $data['width'] ?? 1050,
-            ':height' => $data['height'] ?? 1050,
-        ]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 }

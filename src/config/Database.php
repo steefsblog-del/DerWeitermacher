@@ -1,6 +1,6 @@
 <?php
 /**
- * Datenbankverbindungsklasse
+ * Datenbank-Konfiguration und Verbindung
  */
 
 namespace RSA21\Config;
@@ -11,11 +11,7 @@ use PDOException;
 class Database {
     private static $instance = null;
     private $connection;
-    private $error;
 
-    /**
-     * Singleton Konstruktor
-     */
     private function __construct() {
         try {
             $this->connection = new PDO(
@@ -29,14 +25,10 @@ class Database {
                 ]
             );
         } catch (PDOException $e) {
-            $this->error = $e->getMessage();
-            die('Datenbankverbindung fehlgeschlagen: ' . $this->error);
+            die('Datenbankverbindung fehlgeschlagen: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Singleton getInstance
-     */
     public static function getInstance() {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -44,31 +36,10 @@ class Database {
         return self::$instance;
     }
 
-    /**
-     * PDO Instanz zurückgeben
-     */
     public function getConnection() {
         return $this->connection;
     }
 
-    /**
-     * Query ausführen
-     */
-    public function query($sql, $params = []) {
-        try {
-            $stmt = $this->connection->prepare($sql);
-            $stmt->execute($params);
-            return $stmt;
-        } catch (PDOException $e) {
-            $this->error = $e->getMessage();
-            return false;
-        }
-    }
-
-    /**
-     * Fehler zurückgeben
-     */
-    public function getError() {
-        return $this->error;
-    }
+    private function __clone() {}
+    private function __wakeup() {}
 }
