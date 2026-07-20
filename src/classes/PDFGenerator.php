@@ -1,212 +1,99 @@
 <?php
 /**
- * PDF Dokumentgenerator
+ * PDF Generator Klasse
  */
 
 namespace RSA21\Classes;
 
 use Mpdf\Mpdf;
+use Mpdf\Output\Destination;
 
 class PDFGenerator {
     private $mpdf;
-    private $project;
-    private $signs;
 
     public function __construct() {
-        try {
-            $this->mpdf = new Mpdf([
-                'tempDir' => PDF_TEMP_DIR,
-                'fontDir' => PDF_FONT_DIR,
-                'mode' => 'utf-8',
-                'format' => 'A4',
-                'orientation' => 'P',
-                'margin_left' => 15,
-                'margin_right' => 15,
-                'margin_top' => 20,
-                'margin_bottom' => 15,
-            ]);
-        } catch (\Exception $e) {
-            throw new \Exception('PDF-Bibliothek Fehler: ' . $e->getMessage());
-        }
+        $this->mpdf = new Mpdf([
+            'tempDir' => PDF_TEMP_DIR,
+            'fontDir' => PDF_FONT_DIR,
+            'default_font' => 'Arial',
+        ]);
     }
 
     /**
      * Verkehrszeichenplan generieren
      */
-    public function generateTrafficSignPlan($projectId, $userId) {
-        $project = new Project();
-        $this->project = $project->getProject($projectId, $userId);
-        
-        if (!$this->project) {
-            throw new \Exception('Projekt nicht gefunden');
-        }
-
-        $html = $this->getTrafficSignPlanHTML();
+    public function generateTrafficPlan($project, $signs) {
+        $html = $this->buildTrafficPlanHTML($project, $signs);
         $this->mpdf->WriteHTML($html);
-        
-        return $this->savePDF('Verkehrszeichenplan_' . $projectId);
+        return $this->mpdf->Output('Verkehrszeichenplan_' . $project['id'] . '.pdf', Destination::FILE_PATH);
     }
 
     /**
      * Umleitungsplan generieren
      */
-    public function generateDiversionPlan($projectId, $userId) {
-        $project = new Project();
-        $this->project = $project->getProject($projectId, $userId);
-        
-        if (!$this->project) {
-            throw new \Exception('Projekt nicht gefunden');
-        }
-
-        $html = $this->getDiversionPlanHTML();
+    public function generateDiversionPlan($project, $signs) {
+        $html = $this->buildDiversionPlanHTML($project, $signs);
         $this->mpdf->WriteHTML($html);
-        
-        return $this->savePDF('Umleitungsplan_' . $projectId);
+        return $this->mpdf->Output('Umleitungsplan_' . $project['id'] . '.pdf', Destination::FILE_PATH);
     }
 
     /**
-     * Antrag auf verkehrsrechtliche Anordnung generieren
+     * Beschilderungsplan generieren
      */
-    public function generateTrafficOrderRequest($projectId, $userId) {
-        $project = new Project();
-        $this->project = $project->getProject($projectId, $userId);
-        
-        if (!$this->project) {
-            throw new \Exception('Projekt nicht gefunden');
-        }
-
-        $html = $this->getTrafficOrderRequestHTML();
+    public function generateSignagePlan($project, $signs) {
+        $html = $this->buildSignagePlanHTML($project, $signs);
         $this->mpdf->WriteHTML($html);
-        
-        return $this->savePDF('Verkehrsrechtliche_Anordnung_' . $projectId);
+        return $this->mpdf->Output('Beschilderungsplan_' . $project['id'] . '.pdf', Destination::FILE_PATH);
     }
 
     /**
-     * Kontroll- und Prüfprotokoll generieren
+     * Verkehrsrechtliche Anordnung generieren
      */
-    public function generateControlProtocol($projectId, $userId) {
-        $project = new Project();
-        $this->project = $project->getProject($projectId, $userId);
-        
-        if (!$this->project) {
-            throw new \Exception('Projekt nicht gefunden');
-        }
-
-        $html = $this->getControlProtocolHTML();
+    public function generateTrafficOrder($project) {
+        $html = $this->buildTrafficOrderHTML($project);
         $this->mpdf->WriteHTML($html);
-        
-        return $this->savePDF('Kontrollprotokoll_' . $projectId);
+        return $this->mpdf->Output('Verkehrsrechtliche_Anordnung_' . $project['id'] . '.pdf', Destination::FILE_PATH);
+    }
+
+    /**
+     * Kontrollprotokoll generieren
+     */
+    public function generateControlProtocol($project, $signs) {
+        $html = $this->buildControlProtocolHTML($project, $signs);
+        $this->mpdf->WriteHTML($html);
+        return $this->mpdf->Output('Kontrollprotokoll_' . $project['id'] . '.pdf', Destination::FILE_PATH);
     }
 
     /**
      * Baustellendokumentation generieren
      */
-    public function generateSiteDocumentation($projectId, $userId) {
-        $project = new Project();
-        $this->project = $project->getProject($projectId, $userId);
-        
-        if (!$this->project) {
-            throw new \Exception('Projekt nicht gefunden');
-        }
-
-        $html = $this->getSiteDocumentationHTML();
+    public function generateSiteDocumentation($project) {
+        $html = $this->buildSiteDocumentationHTML($project);
         $this->mpdf->WriteHTML($html);
-        
-        return $this->savePDF('Baustellendokumentation_' . $projectId);
+        return $this->mpdf->Output('Baustellendokumentation_' . $project['id'] . '.pdf', Destination::FILE_PATH);
     }
 
-    /**
-     * HTML für Verkehrszeichenplan
-     */
-    private function getTrafficSignPlanHTML() {
-        $html = '<h1>Verkehrszeichenplan nach RSA 21</h1>';
-        $html .= '<div style="background-color: #f5f5f5; padding: 10px; margin: 10px 0;">';
-        $html .= '<h2>Projektinformationen</h2>';
-        $html .= '<p><strong>Projektname:</strong> ' . htmlspecialchars($this->project['project_name']) . '</p>';
-        $html .= '<p><strong>Ort:</strong> ' . htmlspecialchars($this->project['street'] . ', ' . $this->project['zip_code'] . ' ' . $this->project['city']) . '</p>';
-        $html .= '<p><strong>Zeitraum:</strong> ' . $this->project['start_date'] . ' bis ' . $this->project['end_date'] . '</p>';
-        $html .= '<p><strong>Beschreibung:</strong> ' . htmlspecialchars($this->project['description']) . '</p>';
-        $html .= '</div>';
-        $html .= '<h3>Platzierte Verkehrszeichen</h3>';
-        $html .= '<table border="1" cellpadding="5" style="width: 100%;">';
-        $html .= '<tr style="background-color: #ddd;"><th>Zeichen-Code</th><th>Bezeichnung</th><th>Kategorie</th><th>Position</th></tr>';
-        
-        // TODO: Zeichen aus Datenbank laden und einfügen
-        
-        $html .= '</table>';
-        $html .= '<p style="margin-top: 20px; font-size: 10px;">Dieses Dokument wurde automatisch generiert. Bitte vor der Verwendung überprüfen.</p>';
-        
-        return $html;
+    private function buildTrafficPlanHTML($project, $signs) {
+        return "<h1>Verkehrszeichenplan</h1><p>Projekt: {$project['project_name']}</p>";
     }
 
-    /**
-     * HTML für Umleitungsplan
-     */
-    private function getDiversionPlanHTML() {
-        $html = '<h1>Umleitungsplan</h1>';
-        $html .= '<div style="background-color: #f5f5f5; padding: 10px; margin: 10px 0;">';
-        $html .= '<h2>Projektinformationen</h2>';
-        $html .= '<p><strong>Projektname:</strong> ' . htmlspecialchars($this->project['project_name']) . '</p>';
-        $html .= '<p><strong>Ort:</strong> ' . htmlspecialchars($this->project['street'] . ', ' . $this->project['zip_code'] . ' ' . $this->project['city']) . '</p>';
-        $html .= '</div>';
-        $html .= '<h3>Umleitungsrouten</h3>';
-        $html .= '<p>Karte und Routeninformationen folgen...</p>';
-        
-        return $html;
+    private function buildDiversionPlanHTML($project, $signs) {
+        return "<h1>Umleitungsplan</h1><p>Projekt: {$project['project_name']}</p>";
     }
 
-    /**
-     * HTML für Antrag auf verkehrsrechtliche Anordnung
-     */
-    private function getTrafficOrderRequestHTML() {
-        $html = '<h1>Antrag auf verkehrsrechtliche Anordnung</h1>';
-        $html .= '<div style="background-color: #f5f5f5; padding: 10px; margin: 10px 0;">';
-        $html .= '<h2>Antragsteller</h2>';
-        $html .= '<p>Antragsteller-Details hier einfügen</p>';
-        $html .= '<h2>Baustelle</h2>';
-        $html .= '<p><strong>Ort:</strong> ' . htmlspecialchars($this->project['street'] . ', ' . $this->project['zip_code'] . ' ' . $this->project['city']) . '</p>';
-        $html .= '<p><strong>Zeitraum:</strong> ' . $this->project['start_date'] . ' bis ' . $this->project['end_date'] . '</p>';
-        $html .= '</div>';
-        
-        return $html;
+    private function buildSignagePlanHTML($project, $signs) {
+        return "<h1>Beschilderungsplan</h1><p>Projekt: {$project['project_name']}</p>";
     }
 
-    /**
-     * HTML für Kontroll- und Prüfprotokoll
-     */
-    private function getControlProtocolHTML() {
-        $html = '<h1>Kontroll- und Prüfprotokoll</h1>';
-        $html .= '<p>Validierungsstatus und Prüfdetails...</p>';
-        
-        return $html;
+    private function buildTrafficOrderHTML($project) {
+        return "<h1>Verkehrsrechtliche Anordnung</h1><p>Projekt: {$project['project_name']}</p>";
     }
 
-    /**
-     * HTML für Baustellendokumentation
-     */
-    private function getSiteDocumentationHTML() {
-        $html = '<h1>Baustellendokumentation</h1>';
-        $html .= '<div style="background-color: #f5f5f5; padding: 10px; margin: 10px 0;">';
-        $html .= '<h2>Projekt: ' . htmlspecialchars($this->project['project_name']) . '</h2>';
-        $html .= '<p><strong>Ort:</strong> ' . htmlspecialchars($this->project['street'] . ', ' . $this->project['zip_code'] . ' ' . $this->project['city']) . '</p>';
-        $html .= '<p><strong>Zeitraum:</strong> ' . $this->project['start_date'] . ' bis ' . $this->project['end_date'] . '</p>';
-        $html .= '<p><strong>Status:</strong> ' . ucfirst($this->project['status']) . '</p>';
-        $html .= '</div>';
-        
-        return $html;
+    private function buildControlProtocolHTML($project, $signs) {
+        return "<h1>Kontrollprotokoll</h1><p>Projekt: {$project['project_name']}</p>";
     }
 
-    /**
-     * PDF speichern
-     */
-    private function savePDF($filename) {
-        if (!is_dir(UPLOAD_DIR)) {
-            mkdir(UPLOAD_DIR, 0755, true);
-        }
-
-        $filepath = UPLOAD_DIR . $filename . '_' . date('Y-m-d_H-i-s') . '.pdf';
-        $this->mpdf->Output($filepath, 'F');
-        
-        return $filepath;
+    private function buildSiteDocumentationHTML($project) {
+        return "<h1>Baustellendokumentation</h1><p>Projekt: {$project['project_name']}</p>";
     }
 }

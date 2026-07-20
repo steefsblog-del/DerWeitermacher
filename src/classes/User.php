@@ -17,86 +17,87 @@ class User {
     }
 
     /**
-     * Benutzer registrieren
-     */
-    public function register($data) {
-        $sql = "INSERT INTO {$this->table} (username, email, password_hash, firstname, lastname, company, phone, role)
-                VALUES (:username, :email, :password_hash, :firstname, :lastname, :company, :phone, :role)";
-
-        $stmt = $this->db->prepare($sql);
-        
-        return $stmt->execute([
-            ':username' => $data['username'],
-            ':email' => $data['email'],
-            ':password_hash' => password_hash($data['password'], PASSWORD_BCRYPT),
-            ':firstname' => $data['firstname'] ?? null,
-            ':lastname' => $data['lastname'] ?? null,
-            ':company' => $data['company'] ?? null,
-            ':phone' => $data['phone'] ?? null,
-            ':role' => 'user'
-        ]);
-    }
-
-    /**
      * Benutzer authentifizieren
      */
     public function authenticate($email, $password) {
         $sql = "SELECT * FROM {$this->table} WHERE email = :email AND status = 'active'";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':email' => $email]);
-        
         $user = $stmt->fetch();
-        
+
         if ($user && password_verify($password, $user['password_hash'])) {
-            // Update last_login
-            $updateSql = "UPDATE {$this->table} SET last_login = NOW() WHERE id = :id";
-            $updateStmt = $this->db->prepare($updateSql);
-            $updateStmt->execute([':id' => $user['id']]);
-            
             return $user;
         }
-        
         return false;
     }
 
     /**
-     * Benutzer nach ID abrufen
+     * Benutzer registrieren
      */
-    public function getUserById($id) {
-        $sql = "SELECT * FROM {$this->table} WHERE id = :id";
+    public function register($data) {
+        if (empty($data['email']) || empty($data['password']) || empty($data['username'])) {
+            return false;
+        }
+
+        $sql = "INSERT INTO {$this->table} 
+                (username, email, firstname, lastname, company, password_hash, role, status, created_at)
+                VALUES 
+                (:username, :email, :firstname, :lastname, :company, :password_hash, :role, :status, NOW())";
+
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([':id' => $id]);
+        
+        return $stmt->execute([
+            ':username' => $data['username'],
+            ':email' => $data['email'],
+            ':firstname' => $data['firstname'] ?? '',
+            ':lastname' => $data['lastname'] ?? '',
+            ':company' => $data['company'] ?? '',
+            ':password_hash' => password_hash($data['password'], PASSWORD_BCRYPT),
+            ':role' => 'user',
+            ':status' => 'active'
+        ]);
+    }
+
+    /**
+     * Prüfe ob E-Mail bereits existiert
+     */
+    public function emailExists($email) {
+        $sql = "SELECT id FROM {$this->table} WHERE email = :email";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':email' => $email]);
+        return $stmt->fetch() !== false;
+    }
+
+    /**
+     * Benutzer abrufen nach ID
+     */
+    public function getUserById($userId) {
+        $sql = "SELECT id, username, email, firstname, lastname, company, role, created_at FROM {$this->table} WHERE id = :id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':id' => $userId]);
         return $stmt->fetch();
     }
 
     /**
      * Benutzer aktualisieren
      */
-    public function updateUser($id, $data) {
+    public function updateUser($userId, $data) {
         $fields = [];
-        $params = [':id' => $id];
-        
+        $params = [':id' => $userId];
+
+        $allowedFields = ['username', 'firstname', 'lastname', 'company'];
+
         foreach ($data as $key => $value) {
-            if (in_array($key, ['firstname', 'lastname', 'company', 'phone', 'email'])) {
+            if (in_array($key, $allowedFields)) {
                 $fields[] = "$key = :$key";
                 $params[":$key"] = $value;
             }
         }
-        
+
         if (empty($fields)) return false;
-        
+
         $sql = "UPDATE {$this->table} SET " . implode(', ', $fields) . " WHERE id = :id";
         $stmt = $this->db->prepare($sql);
         return $stmt->execute($params);
-    }
-
-    /**
-     * Email existiert bereits?
-     */
-    public function emailExists($email) {
-        $sql = "SELECT id FROM {$this->table} WHERE email = :email";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([':email' => $email]);
-        return $stmt->rowCount() > 0;
     }
 }
